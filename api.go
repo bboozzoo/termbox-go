@@ -15,8 +15,42 @@ import (
 
 // public API
 
-// Initializes termbox library. This function should be called before any other functions.
-// After successful initialization, the library must be finalized using 'Close' function.
+// Initializes termbox library using the provided terminal device. This
+// function, or Init(), should be called before any other functions. After
+// successful initialization, the library must be finalized using 'Close'
+// function.
+//
+// Example usage:
+//      err := termbox.InitTerm("/dev/tty1")
+//      if err != nil {
+//              panic(err)
+//      }
+//      defer termbox.Close()
+func InitTerm(termPath string) error {
+	var outf, inf *os.File
+	var err error
+	if runtime.GOOS == "openbsd" || runtime.GOOS == "freebsd" {
+		outf, err = os.OpenFile(termPath, os.O_RDWR, 0)
+		if err != nil {
+			return err
+		}
+		inf = outf
+	} else {
+		outf, err = os.OpenFile(termPath, os.O_WRONLY, 0)
+		if err != nil {
+			return err
+		}
+		inf, err = os.OpenFile(termPath, os.O_RDONLY, 0)
+		if err != nil {
+			return err
+		}
+	}
+	return initTerm(inf, outf)
+}
+
+// Initializes termbox library using the default terminal device. This function
+// should be called before any other functions. After successful initialization,
+// the library must be finalized using 'Close' function.
 //
 // Example usage:
 //      err := termbox.Init()
@@ -25,24 +59,15 @@ import (
 //      }
 //      defer termbox.Close()
 func Init() error {
+	return InitTerm("/dev/tty")
+}
+
+func initTerm(termIn, termOut *os.File) error {
 	var err error
 
-	if runtime.GOOS == "openbsd" || runtime.GOOS == "freebsd" {
-		out, err = os.OpenFile("/dev/tty", os.O_RDWR, 0)
-		if err != nil {
-			return err
-		}
-		in = int(out.Fd())
-	} else {
-		out, err = os.OpenFile("/dev/tty", os.O_WRONLY, 0)
-		if err != nil {
-			return err
-		}
-		in, err = syscall.Open("/dev/tty", syscall.O_RDONLY, 0)
-		if err != nil {
-			return err
-		}
-	}
+	out = termOut
+	inf = termIn
+	in = int(inf.Fd())
 
 	err = setup_term()
 	if err != nil {
@@ -140,7 +165,7 @@ func Close() {
 	tcsetattr(out.Fd(), &orig_tios)
 
 	out.Close()
-	syscall.Close(in)
+	inf.Close()
 
 	// reset the state, so that on next Init() it will work again
 	termw = 0

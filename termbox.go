@@ -63,6 +63,7 @@ var (
 	input_mode     = InputEsc
 	output_mode    = OutputNormal
 	out            *os.File
+	inf            *os.File
 	in             int
 	lastfg         = attr_invalid
 	lastbg         = attr_invalid
